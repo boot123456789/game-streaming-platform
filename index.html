@@ -24,12 +24,16 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #333;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         .logo {
             font-size: 24px;
             font-weight: bold;
             color: #ff0000;
+            cursor: pointer;
         }
 
         nav {
@@ -42,6 +46,7 @@
             text-decoration: none;
             font-size: 14px;
             transition: color 0.3s;
+            cursor: pointer;
         }
 
         nav a:hover {
@@ -87,15 +92,22 @@
             cursor: pointer;
             border-radius: 8px;
             transition: background-color 0.3s;
+            user-select: none;
         }
 
         .sidebar-item:hover {
             background-color: #333;
         }
 
+        .sidebar-item.active {
+            background-color: #ff0000;
+        }
+
         .main-content {
             flex: 1;
             padding: 30px;
+            max-height: calc(100vh - 70px);
+            overflow-y: auto;
         }
 
         .section-title {
@@ -185,12 +197,25 @@
             font-size: 24px;
             color: #666;
             margin-bottom: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-player canvas {
+            display: block;
         }
 
         .player-controls {
             display: flex;
             gap: 10px;
             justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
 
         button {
@@ -207,6 +232,55 @@
 
         button:hover {
             background-color: #cc0000;
+        }
+
+        button.secondary {
+            background-color: #333;
+        }
+
+        button.secondary:hover {
+            background-color: #555;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            width: 150px;
+            cursor: pointer;
+        }
+
+        .time-display {
+            font-size: 12px;
+            color: #aaa;
+            min-width: 50px;
+        }
+
+        .game-selection {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+        }
+
+        .game-selection label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .game-selection select {
+            width: 100%;
+            max-width: 300px;
+            padding: 10px;
+            background-color: #222;
+            color: #fff;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
         }
 
         @media (max-width: 768px) {
@@ -231,158 +305,631 @@
             .video-player {
                 height: 300px;
             }
+
+            .player-controls {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
     <header>
-        <div class="logo">🎮 GameStream</div>
+        <div class="logo" onclick="location.reload()">🎮 GameStream</div>
         <div class="search-bar">
-            <input type="text" placeholder="Search games, channels...">
+            <input type="text" id="searchInput" placeholder="Search games, channels...">
         </div>
         <nav>
-            <a href="#home">Home</a>
-            <a href="#trending">Trending</a>
-            <a href="#categories">Categories</a>
-            <a href="#profile">Profile</a>
+            <a onclick="showHome()">Home</a>
+            <a onclick="showTrending()">Trending</a>
+            <a onclick="showCategories()">Categories</a>
         </nav>
     </header>
 
     <div class="container">
         <div class="sidebar">
-            <div class="sidebar-item">🏠 Home</div>
-            <div class="sidebar-item">🔥 Trending</div>
-            <div class="sidebar-item">🎮 Games</div>
-            <div class="sidebar-item">📺 Following</div>
-            <div class="sidebar-item">⭐ Favorites</div>
-            <div class="sidebar-item">📺 My Channel</div>
+            <div class="sidebar-item active" onclick="showHome()">🏠 Home</div>
+            <div class="sidebar-item" onclick="showTrending()">🔥 Trending</div>
+            <div class="sidebar-item" onclick="showCategories()">🎮 Games</div>
+            <div class="sidebar-item" onclick="showFollowing()">📺 Following</div>
+            <div class="sidebar-item" onclick="showFavorites()">⭐ Favorites</div>
         </div>
 
         <div class="main-content">
             <div class="player-section">
-                <h2 class="section-title">Now Playing</h2>
-                <div class="video-player">
-                    📹 Video Player
+                <h2 class="section-title" id="playerTitle">Now Playing</h2>
+                <div class="video-player" id="gameCanvas">
+                    <canvas id="canvas"></canvas>
                 </div>
                 <div class="player-controls">
-                    <button>▶ Play</button>
-                    <button>⏸ Pause</button>
-                    <button>🔊 Mute</button>
-                    <button>⛔ Stop</button>
+                    <div class="control-group">
+                        <button onclick="togglePlay()">▶ Play</button>
+                        <button class="secondary" onclick="pauseGame()">⏸ Pause</button>
+                        <button class="secondary" onclick="stopGame()">⛔ Stop</button>
+                    </div>
+                    <div class="control-group">
+                        <button class="secondary" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+                        <button class="secondary" onclick="toggleMute()">🔊 Unmute</button>
+                    </div>
+                </div>
+                <div class="control-group slider-container" style="margin-top: 15px; justify-content: center;">
+                    <label style="margin: 0;">Speed:</label>
+                    <input type="range" id="speedSlider" min="0.5" max="2" step="0.25" value="1" onchange="setGameSpeed(this.value)">
+                    <span class="time-display" id="speedDisplay">1x</span>
+                </div>
+                <div class="control-group slider-container" style="margin-top: 10px; justify-content: center;">
+                    <label style="margin: 0;">Volume:</label>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="100" onchange="setVolume(this.value)">
+                    <span class="time-display" id="volumeDisplay">100%</span>
+                </div>
+                <div class="game-selection">
+                    <label for="gameSelect">Select Game:</label>
+                    <select id="gameSelect" onchange="changeGame(this.value)">
+                        <option value="flappy">Flappy Bird Game</option>
+                        <option value="snake">Snake Game</option>
+                        <option value="pong">Pong Game</option>
+                        <option value="breakout">Breakout Game</option>
+                    </select>
                 </div>
             </div>
 
             <h2 class="section-title">Live Streams</h2>
-            <div class="streams-grid">
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        <div class="live-badge">LIVE</div>
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">Elden Ring Speedrun</div>
-                        <div class="stream-channel">ProGamer123</div>
-                        <div class="stream-viewers">2.5K watching</div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        <div class="live-badge">LIVE</div>
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">Fortnite Competitive</div>
-                        <div class="stream-channel">EsportsKing</div>
-                        <div class="stream-viewers">5.1K watching</div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        <div class="live-badge">LIVE</div>
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">Valorant Ranked</div>
-                        <div class="stream-channel">TacticalPlayer</div>
-                        <div class="stream-viewers">1.8K watching</div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        <div class="live-badge">LIVE</div>
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">Minecraft Building</div>
-                        <div class="stream-channel">CreativeBuilder</div>
-                        <div class="stream-viewers">3.2K watching</div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        <div class="live-badge">LIVE</div>
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">League of Legends</div>
-                        <div class="stream-channel">MidLaneQueen</div>
-                        <div class="stream-viewers">4.7K watching</div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        <div class="live-badge">LIVE</div>
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">Call of Duty</div>
-                        <div class="stream-channel">SharpShooter</div>
-                        <div class="stream-viewers">6.3K watching</div>
-                    </div>
-                </div>
-            </div>
-
-            <h2 class="section-title">Recommended</h2>
-            <div class="streams-grid">
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">Baldur's Gate 3</div>
-                        <div class="stream-channel">RoleplayMaster</div>
-                        <div class="stream-viewers">Watch now</div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">Palworld Adventure</div>
-                        <div class="stream-channel">AdventureSeeker</div>
-                        <div class="stream-viewers">Watch now</div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="stream-thumbnail">
-                        🎮
-                    </div>
-                    <div class="stream-info">
-                        <div class="stream-title">Street Fighter 6</div>
-                        <div class="stream-channel">FightingPro</div>
-                        <div class="stream-viewers">Watch now</div>
-                    </div>
-                </div>
+            <div class="streams-grid" id="streamsGrid">
+                <!-- Dynamically populated -->
             </div>
         </div>
     </div>
+
+    <script>
+        // Game variables
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let gameState = {
+            isPlaying: false,
+            isPaused: false,
+            isMuted: false,
+            speed: 1,
+            volume: 100,
+            currentGame: 'flappy'
+        };
+
+        // Resize canvas
+        function resizeCanvas() {
+            let container = document.getElementById('gameCanvas');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Flappy Bird Game
+        let flappyBird = {
+            x: 50,
+            y: 150,
+            width: 30,
+            height: 30,
+            velocity: 0,
+            gravity: 0.5,
+            jump: -10,
+            pipes: [],
+            score: 0,
+            gameOver: false
+        };
+
+        // Snake Game
+        let snakeGame = {
+            snake: [{x: 100, y: 100}],
+            food: {x: 300, y: 300},
+            direction: {x: 5, y: 0},
+            nextDirection: {x: 5, y: 0},
+            score: 0,
+            gameOver: false
+        };
+
+        // Pong Game
+        let pongGame = {
+            ball: {x: canvas.width / 2, y: canvas.height / 2, radius: 8, vx: 3, vy: 3},
+            paddle1: {x: 10, y: canvas.height / 2 - 40, width: 10, height: 80},
+            paddle2: {x: canvas.width - 20, y: canvas.height / 2 - 40, width: 10, height: 80},
+            score1: 0,
+            score2: 0,
+            gameOver: false
+        };
+
+        // Breakout Game
+        let breakoutGame = {
+            paddle: {x: canvas.width / 2 - 40, y: canvas.height - 20, width: 80, height: 10},
+            ball: {x: canvas.width / 2, y: canvas.height - 40, radius: 6, vx: 3, vy: -3},
+            bricks: [],
+            score: 0,
+            gameOver: false,
+            ballStuck: true
+        };
+
+        // Initialize bricks for breakout
+        function initBreakout() {
+            breakoutGame.bricks = [];
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 6; col++) {
+                    breakoutGame.bricks.push({
+                        x: col * (canvas.width / 6),
+                        y: 50 + row * 25,
+                        width: canvas.width / 6 - 2,
+                        height: 20,
+                        active: true
+                    });
+                }
+            }
+        }
+        initBreakout();
+
+        // Keyboard controls
+        let keysPressed = {};
+        window.addEventListener('keydown', (e) => {
+            keysPressed[e.key] = true;
+            
+            // Snake controls
+            if (gameState.currentGame === 'snake') {
+                if (e.key === 'ArrowUp' && snakeGame.direction.y === 0) snakeGame.nextDirection = {x: 0, y: -5};
+                if (e.key === 'ArrowDown' && snakeGame.direction.y === 0) snakeGame.nextDirection = {x: 0, y: 5};
+                if (e.key === 'ArrowLeft' && snakeGame.direction.x === 0) snakeGame.nextDirection = {x: -5, y: 0};
+                if (e.key === 'ArrowRight' && snakeGame.direction.x === 0) snakeGame.nextDirection = {x: 5, y: 0};
+            }
+
+            // Flappy bird jump
+            if (gameState.currentGame === 'flappy' && (e.key === ' ' || e.key === 'Enter')) {
+                e.preventDefault();
+                flappyBird.velocity = flappyBird.jump;
+            }
+
+            // Breakout paddle release ball
+            if (gameState.currentGame === 'breakout' && (e.key === ' ' || e.key === 'Enter')) {
+                breakoutGame.ballStuck = false;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keysPressed[e.key] = false;
+        });
+
+        // Mouse controls for Pong and Breakout
+        document.addEventListener('mousemove', (e) => {
+            if (gameState.currentGame === 'pong') {
+                pongGame.paddle2.y = e.clientY - canvas.getBoundingClientRect().top - pongGame.paddle2.height / 2;
+                pongGame.paddle2.y = Math.max(0, Math.min(pongGame.paddle2.y, canvas.height - pongGame.paddle2.height));
+            }
+            if (gameState.currentGame === 'breakout') {
+                breakoutGame.paddle.x = e.clientX - canvas.getBoundingClientRect().left - breakoutGame.paddle.width / 2;
+                breakoutGame.paddle.x = Math.max(0, Math.min(breakoutGame.paddle.x, canvas.width - breakoutGame.paddle.width));
+            }
+        });
+
+        // Game update functions
+        function updateFlappyBird() {
+            if (!gameState.isPlaying || gameState.isPaused) return;
+
+            // Physics
+            flappyBird.velocity += flappyBird.gravity * gameState.speed;
+            flappyBird.y += flappyBird.velocity * gameState.speed;
+
+            // Boundaries
+            if (flappyBird.y < 0 || flappyBird.y > canvas.height) {
+                flappyBird.gameOver = true;
+            }
+
+            // Pipes
+            if (Math.random() < 0.02) {
+                let pipeHeight = Math.random() * (canvas.height - 100) + 50;
+                flappyBird.pipes.push({x: canvas.width, width: 50, top: pipeHeight});
+            }
+
+            flappyBird.pipes = flappyBird.pipes.filter(pipe => {
+                pipe.x -= 3 * gameState.speed;
+                
+                // Collision detection
+                if (pipe.x < flappyBird.x + flappyBird.width &&
+                    pipe.x + pipe.width > flappyBird.x &&
+                    (flappyBird.y < pipe.top || flappyBird.y + flappyBird.height > pipe.top + 100)) {
+                    flappyBird.gameOver = true;
+                }
+
+                if (pipe.x + pipe.width === flappyBird.x) {
+                    flappyBird.score++;
+                }
+
+                return pipe.x > -pipe.width;
+            });
+        }
+
+        function updateSnake() {
+            if (!gameState.isPlaying || gameState.isPaused) return;
+
+            snakeGame.direction = snakeGame.nextDirection;
+            let head = {x: snakeGame.snake[0].x + snakeGame.direction.x, y: snakeGame.snake[0].y + snakeGame.direction.y};
+
+            // Wall collision
+            if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
+                snakeGame.gameOver = true;
+                return;
+            }
+
+            // Self collision
+            for (let segment of snakeGame.snake) {
+                if (head.x === segment.x && head.y === segment.y) {
+                    snakeGame.gameOver = true;
+                    return;
+                }
+            }
+
+            snakeGame.snake.unshift(head);
+
+            // Food collision
+            if (head.x === snakeGame.food.x && head.y === snakeGame.food.y) {
+                snakeGame.score += 10;
+                snakeGame.food = {
+                    x: Math.floor(Math.random() * (canvas.width / 10)) * 10,
+                    y: Math.floor(Math.random() * (canvas.height / 10)) * 10
+                };
+            } else {
+                snakeGame.snake.pop();
+            }
+        }
+
+        function updatePong() {
+            if (!gameState.isPlaying || gameState.isPaused) return;
+
+            // Ball movement
+            pongGame.ball.x += pongGame.ball.vx * gameState.speed;
+            pongGame.ball.y += pongGame.ball.vy * gameState.speed;
+
+            // Paddle 1 AI
+            let paddle1Center = pongGame.paddle1.y + pongGame.paddle1.height / 2;
+            if (paddle1Center < pongGame.ball.y) pongGame.paddle1.y += 3 * gameState.speed;
+            if (paddle1Center > pongGame.ball.y) pongGame.paddle1.y -= 3 * gameState.speed;
+
+            // Ball collision with paddles
+            if (pongGame.ball.x - pongGame.ball.radius < pongGame.paddle1.x + pongGame.paddle1.width &&
+                pongGame.ball.y > pongGame.paddle1.y &&
+                pongGame.ball.y < pongGame.paddle1.y + pongGame.paddle1.height) {
+                pongGame.ball.vx = Math.abs(pongGame.ball.vx);
+            }
+
+            if (pongGame.ball.x + pongGame.ball.radius > pongGame.paddle2.x &&
+                pongGame.ball.y > pongGame.paddle2.y &&
+                pongGame.ball.y < pongGame.paddle2.y + pongGame.paddle2.height) {
+                pongGame.ball.vx = -Math.abs(pongGame.ball.vx);
+            }
+
+            // Ball collision with top/bottom
+            if (pongGame.ball.y - pongGame.ball.radius < 0 || pongGame.ball.y + pongGame.ball.radius > canvas.height) {
+                pongGame.ball.vy = -pongGame.ball.vy;
+            }
+
+            // Scoring
+            if (pongGame.ball.x < 0) {
+                pongGame.score2++;
+                pongGame.ball = {x: canvas.width / 2, y: canvas.height / 2, radius: 8, vx: 3, vy: 3};
+            }
+            if (pongGame.ball.x > canvas.width) {
+                pongGame.score1++;
+                pongGame.ball = {x: canvas.width / 2, y: canvas.height / 2, radius: 8, vx: -3, vy: 3};
+            }
+        }
+
+        function updateBreakout() {
+            if (!gameState.isPlaying || gameState.isPaused) return;
+
+            if (!breakoutGame.ballStuck) {
+                breakoutGame.ball.x += breakoutGame.ball.vx * gameState.speed;
+                breakoutGame.ball.y += breakoutGame.ball.vy * gameState.speed;
+
+                // Walls
+                if (breakoutGame.ball.x - breakoutGame.ball.radius < 0 || breakoutGame.ball.x + breakoutGame.ball.radius > canvas.width) {
+                    breakoutGame.ball.vx = -breakoutGame.ball.vx;
+                }
+                if (breakoutGame.ball.y - breakoutGame.ball.radius < 0) {
+                    breakoutGame.ball.vy = -breakoutGame.ball.vy;
+                }
+
+                // Paddle
+                if (breakoutGame.ball.y + breakoutGame.ball.radius > breakoutGame.paddle.y &&
+                    breakoutGame.ball.x > breakoutGame.paddle.x &&
+                    breakoutGame.ball.x < breakoutGame.paddle.x + breakoutGame.paddle.width) {
+                    breakoutGame.ball.vy = -breakoutGame.ball.vy;
+                }
+
+                // Game over
+                if (breakoutGame.ball.y > canvas.height) {
+                    breakoutGame.gameOver = true;
+                }
+
+                // Bricks
+                for (let brick of breakoutGame.bricks) {
+                    if (!brick.active) continue;
+                    if (breakoutGame.ball.x > brick.x &&
+                        breakoutGame.ball.x < brick.x + brick.width &&
+                        breakoutGame.ball.y > brick.y &&
+                        breakoutGame.ball.y < brick.y + brick.height) {
+                        brick.active = false;
+                        breakoutGame.ball.vy = -breakoutGame.ball.vy;
+                        breakoutGame.score += 10;
+                    }
+                }
+            } else {
+                // Ball stuck to paddle
+                breakoutGame.ball.x = breakoutGame.paddle.x + breakoutGame.paddle.width / 2;
+                breakoutGame.ball.y = breakoutGame.paddle.y - breakoutGame.ball.radius - 2;
+            }
+        }
+
+        // Game draw functions
+        function drawFlappyBird() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(flappyBird.x, flappyBird.y, flappyBird.width, flappyBird.height);
+
+            ctx.fillStyle = '#228B22';
+            for (let pipe of flappyBird.pipes) {
+                ctx.fillRect(pipe.x, 0, pipe.width, pipe.top);
+                ctx.fillRect(pipe.x, pipe.top + 100, pipe.width, canvas.height - pipe.top - 100);
+            }
+
+            ctx.fillStyle = '#FFF';
+            ctx.font = '20px Arial';
+            ctx.fillText('Score: ' + flappyBird.score, 10, 30);
+
+            if (flappyBird.gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 30);
+                ctx.font = '20px Arial';
+                ctx.fillText('Score: ' + flappyBird.score, canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText('Press Play to restart', canvas.width / 2, canvas.height / 2 + 60);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        function drawSnake() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#00FF00';
+            for (let segment of snakeGame.snake) {
+                ctx.fillRect(segment.x, segment.y, 10, 10);
+            }
+
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(snakeGame.food.x, snakeGame.food.y, 10, 10);
+
+            ctx.fillStyle = '#FFF';
+            ctx.font = '20px Arial';
+            ctx.fillText('Score: ' + snakeGame.score, 10, 30);
+
+            if (snakeGame.gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 30);
+                ctx.font = '20px Arial';
+                ctx.fillText('Score: ' + snakeGame.score, canvas.width / 2, canvas.height / 2 + 20);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        function drawPong() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#FFF';
+            ctx.fillRect(pongGame.paddle1.x, pongGame.paddle1.y, pongGame.paddle1.width, pongGame.paddle1.height);
+            ctx.fillRect(pongGame.paddle2.x, pongGame.paddle2.y, pongGame.paddle2.width, pongGame.paddle2.height);
+
+            ctx.beginPath();
+            ctx.arc(pongGame.ball.x, pongGame.ball.y, pongGame.ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.font = 'bold 30px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(pongGame.score1, canvas.width / 4, 40);
+            ctx.fillText(pongGame.score2, (canvas.width * 3) / 4, 40);
+            ctx.textAlign = 'left';
+        }
+
+        function drawBreakout() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(breakoutGame.paddle.x, breakoutGame.paddle.y, breakoutGame.paddle.width, breakoutGame.paddle.height);
+
+            ctx.fillStyle = '#00FFFF';
+            ctx.beginPath();
+            ctx.arc(breakoutGame.ball.x, breakoutGame.ball.y, breakoutGame.ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#FF6347';
+            for (let brick of breakoutGame.bricks) {
+                if (brick.active) {
+                    ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+                }
+            }
+
+            ctx.fillStyle = '#FFF';
+            ctx.font = '20px Arial';
+            ctx.fillText('Score: ' + breakoutGame.score, 10, 30);
+
+            if (breakoutGame.gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+                ctx.font = '20px Arial';
+                ctx.fillText('Score: ' + breakoutGame.score, canvas.width / 2, canvas.height / 2 + 40);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // Main game loop
+        function gameLoop() {
+            if (gameState.currentGame === 'flappy') {
+                updateFlappyBird();
+                drawFlappyBird();
+            } else if (gameState.currentGame === 'snake') {
+                updateSnake();
+                drawSnake();
+            } else if (gameState.currentGame === 'pong') {
+                updatePong();
+                drawPong();
+            } else if (gameState.currentGame === 'breakout') {
+                updateBreakout();
+                drawBreakout();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
+
+        // Control functions
+        function togglePlay() {
+            if (!gameState.isPlaying) {
+                resetGame();
+                gameState.isPlaying = true;
+                gameState.isPaused = false;
+            } else if (gameState.isPaused) {
+                gameState.isPaused = false;
+            } else {
+                gameState.isPaused = true;
+            }
+        }
+
+        function pauseGame() {
+            gameState.isPaused = true;
+        }
+
+        function stopGame() {
+            gameState.isPlaying = false;
+            gameState.isPaused = false;
+            resetGame();
+        }
+
+        function resetGame() {
+            if (gameState.currentGame === 'flappy') {
+                flappyBird = {x: 50, y: 150, width: 30, height: 30, velocity: 0, gravity: 0.5, jump: -10, pipes: [], score: 0, gameOver: false};
+            } else if (gameState.currentGame === 'snake') {
+                snakeGame = {snake: [{x: 100, y: 100}], food: {x: 300, y: 300}, direction: {x: 5, y: 0}, nextDirection: {x: 5, y: 0}, score: 0, gameOver: false};
+            } else if (gameState.currentGame === 'pong') {
+                pongGame = {ball: {x: canvas.width / 2, y: canvas.height / 2, radius: 8, vx: 3, vy: 3}, paddle1: {x: 10, y: canvas.height / 2 - 40, width: 10, height: 80}, paddle2: {x: canvas.width - 20, y: canvas.height / 2 - 40, width: 10, height: 80}, score1: 0, score2: 0, gameOver: false};
+            } else if (gameState.currentGame === 'breakout') {
+                breakoutGame = {paddle: {x: canvas.width / 2 - 40, y: canvas.height - 20, width: 80, height: 10}, ball: {x: canvas.width / 2, y: canvas.height - 40, radius: 6, vx: 3, vy: -3}, bricks: [], score: 0, gameOver: false, ballStuck: true};
+                initBreakout();
+            }
+        }
+
+        function toggleFullscreen() {
+            let elem = document.getElementById('gameCanvas');
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen().catch(err => alert('Fullscreen not supported'));
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function toggleMute() {
+            gameState.isMuted = !gameState.isMuted;
+            document.querySelector('button:nth-child(6)').textContent = gameState.isMuted ? '🔇 Muted' : '🔊 Unmute';
+        }
+
+        function setGameSpeed(speed) {
+            gameState.speed = parseFloat(speed);
+            document.getElementById('speedDisplay').textContent = speed + 'x';
+        }
+
+        function setVolume(vol) {
+            gameState.volume = vol;
+            document.getElementById('volumeDisplay').textContent = vol + '%';
+        }
+
+        function changeGame(game) {
+            gameState.currentGame = game;
+            gameState.isPlaying = false;
+            gameState.isPaused = false;
+            resetGame();
+            
+            let titles = {
+                flappy: 'Flappy Bird',
+                snake: 'Snake Game',
+                pong: 'Pong Game',
+                breakout: 'Breakout Game'
+            };
+            document.getElementById('playerTitle').textContent = 'Now Playing: ' + titles[game];
+        }
+
+        // Streams data
+        const streams = [
+            {title: 'Elden Ring Speedrun', channel: 'ProGamer123', viewers: '2.5K', emoji: '⚔️'},
+            {title: 'Fortnite Competitive', channel: 'EsportsKing', viewers: '5.1K', emoji: '🏆'},
+            {title: 'Valorant Ranked', channel: 'TacticalPlayer', viewers: '1.8K', emoji: '🎯'},
+            {title: 'Minecraft Building', channel: 'CreativeBuilder', viewers: '3.2K', emoji: '🏗️'},
+            {title: 'League of Legends', channel: 'MidLaneQueen', viewers: '4.7K', emoji: '👑'},
+            {title: 'Call of Duty', channel: 'SharpShooter', viewers: '6.3K', emoji: '🔫'}
+        ];
+
+        function renderStreams(data = streams) {
+            let grid = document.getElementById('streamsGrid');
+            grid.innerHTML = data.map(stream => `
+                <div class="stream-card" onclick="changeGame('flappy'); togglePlay()">
+                    <div class="stream-thumbnail">
+                        <div class="live-badge">LIVE</div>
+                        ${stream.emoji}
+                    </div>
+                    <div class="stream-info">
+                        <div class="stream-title">${stream.title}</div>
+                        <div class="stream-channel">${stream.channel}</div>
+                        <div class="stream-viewers">${stream.viewers} watching</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showHome() {
+            renderStreams(streams);
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.sidebar-item')[0].classList.add('active');
+        }
+
+        function showTrending() {
+            let trending = streams.sort(() => Math.random() - 0.5);
+            renderStreams(trending);
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.sidebar-item')[1].classList.add('active');
+        }
+
+        function showCategories() {
+            renderStreams(streams);
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.sidebar-item')[2].classList.add('active');
+        }
+
+        function showFollowing() {
+            renderStreams(streams.slice(0, 3));
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.sidebar-item')[3].classList.add('active');
+        }
+
+        function showFavorites() {
+            renderStreams(streams.filter((_, i) => i % 2 === 0));
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.sidebar-item')[4].classList.add('active');
+        }
+
+        // Initialize
+        renderStreams();
+    </script>
 </body>
 </html>
